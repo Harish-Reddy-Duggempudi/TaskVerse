@@ -21,8 +21,8 @@
         <button class="nav-item" data-view="Upcoming">▦ <span>Upcoming</span></button>
         <button class="nav-item" data-view="Completed">✓ <span>Completed</span></button>
       </nav>
-      <p class="nav-label projects-label">PROJECTS</p>
-      <nav id="project-nav"></nav>
+      <div class="projects-heading"><p class="nav-label projects-label">PROJECTS</p><button id="new-project" class="project-add" aria-label="Create project" title="Create project">＋</button></div>
+      <nav id="project-nav" class="project-nav"></nav>
       <div class="sidebar-bottom">
         <div class="sync-label"><span class="sync-dot"></span><span id="sync-status">Not signed in</span></div>
         <div class="user-box" id="user-box" hidden>
@@ -33,7 +33,7 @@
     </aside>
     <main class="main">
       <header class="topbar">
-        <div class="crumb">Workspace <span>/</span> <strong id="current-view">My Day</strong></div>
+        <div class="crumb"><span id="workspace-label">My Workspace</span><span>/</span><strong id="current-view">My Day</strong></div>
         <div class="top-actions">
           <label class="search"><span>⌕</span><input id="search" placeholder="Search tasks or projects…" autocomplete="off"></label>
           <button class="btn primary" id="new-task-top">＋ New task</button>
@@ -41,7 +41,7 @@
       </header>
       <section class="content">
         <div class="hero">
-          <div><p class="eyebrow">✦ A FRESH START</p><h1 id="heading">Your day, your pace.</h1><p class="subheading" id="subheading">Small steps today. Big things over time.</p></div>
+          <div><p class="eyebrow" id="greeting">✦ A FRESH START</p><h1 id="heading">Your day, your pace.</h1><p class="subheading" id="subheading">Small steps today. Big things over time.</p><p class="workspace-owner">Your projects and tasks are private to your signed-in account.</p></div>
           <div class="date-pill" id="today-date"></div>
         </div>
         <section class="stats">
@@ -56,11 +56,20 @@
             <input id="task-title" maxlength="180" placeholder="What do you need to get done?" required>
             <div class="form-grid">
               <label>Project<select id="task-project"></select></label>
+              <label>Status<select id="task-status"><option value="open">Open</option><option value="in-progress">In progress</option><option value="completed">Completed</option></select></label>
               <label>Priority<select id="task-priority"><option>High</option><option selected>Medium</option><option>Low</option></select></label>
               <label>Due date<input id="task-due" type="date"></label>
             </div>
-            <label class="description-label">Notes (optional)<textarea id="task-notes" maxlength="1000" rows="2" placeholder="Add a little context…"></textarea></label>
+            <label class="description-label">Description (optional)<textarea id="task-notes" maxlength="1000" rows="2" placeholder="Add a little context…"></textarea></label>
             <div class="editor-footer"><button type="button" class="btn secondary" id="cancel-editor">Cancel</button><button class="btn primary" id="save-task">Save task</button></div>
+          </form>
+        </section>
+        <section class="task-editor panel" id="project-editor" hidden>
+          <div class="editor-head"><div><h2 id="project-editor-title">Create a project</h2><p>Keep related tasks together.</p></div><button class="icon-btn" id="close-project-editor" aria-label="Close">×</button></div>
+          <form id="project-form">
+            <label class="description-label">Project name<input id="project-name" maxlength="80" required placeholder="Name your project"></label>
+            <label class="description-label">Description (optional)<textarea id="project-description" maxlength="300" rows="2" placeholder="What is this project about?"></textarea></label>
+            <div class="editor-footer"><button type="button" class="btn secondary" id="cancel-project-editor">Cancel</button><button class="btn primary" id="save-project">Create project</button></div>
           </form>
         </section>
         <div class="notice" id="notice" role="status" hidden></div>
@@ -70,7 +79,17 @@
             <div class="empty"><div class="empty-icon">✓</div><h3>Ready when you are.</h3><p>Sign in to load your tasks or create your first task.</p></div>
           </div>
         </section>
-        <footer><span>☁ <span id="footer-sync">Your tasks sync to Firebase</span></span><span>Made for a more focused you ✦</span></footer>
+        <footer class="app-footer">
+          <div class="footer-meta">
+            <span>☁ <span id="footer-sync">Your tasks sync to Firebase</span></span>
+            <span>© 2026 TaskVerse. All rights reserved.</span>
+          </div>
+          <div class="footer-branding">
+            <p>Built with <span class="footer-heart" aria-label="love">♥</span> by <a href="https://www.linkedin.com/in/harish-reddy-duggempudi/" target="_blank" rel="noopener noreferrer">Harish Reddy Duggempudi</a></p>
+            <a class="linkedin-link" href="https://www.linkedin.com/in/harish-reddy-duggempudi/" target="_blank" rel="noopener noreferrer"><span class="linkedin-icon" aria-hidden="true">in</span> Connect on LinkedIn</a>
+            <p class="nexoverse-credit">An initiative by <a href="https://nexoverse.in/" target="_blank" rel="noopener noreferrer">Nexoverse</a> <span aria-hidden="true">🚀</span></p>
+          </div>
+        </footer>
       </section>
     </main>
   </div>

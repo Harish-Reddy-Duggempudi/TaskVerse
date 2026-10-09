@@ -1,0 +1,189 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedInAs(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function projectPath(userId, projectId) {
+      return /databases/$(database)/documents/users/$(userId)/projects/$(projectId);
+    }
+
+    function taskPath(userId, taskId) {
+      return /databases/$(database)/documents/users/$(userId)/tasks/$(taskId);
+    }
+
+    function validProfile(data) {
+      return data.keys().hasOnly(['displayName', 'email', 'photoURL', 'updatedAt'])
+        && data.keys().hasAll(['displayName', 'email', 'updatedAt'])
+        && data.displayName is string
+        && data.email is string
+        && (!('photoURL' in data) || data.photoURL is string)
+        && data.updatedAt is string;
+    }
+
+    function validProject(data) {
+      return data.keys().hasOnly([
+          'name', 'description', 'taskCount', 'createdAt',
+          'updatedAt', 'lastMutationTaskId'
+        ])
+        && data.keys().hasAll([
+          'name', 'description', 'taskCount', 'createdAt',
+          'updatedAt', 'lastMutationTaskId'
+        ])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 80
+        && data.description is string
+        && data.description.size() <= 300
+        && data.taskCount is int
+        && data.taskCount >= 0
+        && data.createdAt is string
+        && data.updatedAt is string
+        && (data.lastMutationTaskId == null || data.lastMutationTaskId is string);
+    }
+
+    function validTask(data) {
+      return data.keys().hasOnly([
+          'title', 'project', 'projectId', 'description', 'notes',
+          'priority', 'status', 'completed', 'dueDate', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasAll([
+          'title', 'project', 'projectId', 'description', 'notes',
+          'priority', 'status', 'completed', 'dueDate', 'createdAt', 'updatedAt'
+        ])
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 180
+        && data.project is string
+        && data.project.size() <= 80
+        && data.projectId is string
+        && data.projectId.size() > 0
+        && data.description is string
+        && data.description.size() <= 1000
+        && data.notes is string
+        && data.notes.size() <= 1000
+        && data.priority in ['High', 'Medium', 'Low']
+        && data.status in ['open', 'in-progress', 'completed']
+        && data.completed is bool
+        && data.completed == (data.status == 'completed')
+        && data.dueDate is string
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+
+    function projectCounterIncremented(userId, projectId, taskId) {
+      let path = projectPath(userId, projectId);
+      return exists(path)
+        && existsAfter(path)
+        && getAfter(path).data.taskCount == get(path).data.taskCount + 1
+        && getAfter(path).data.lastMutationTaskId == taskId;
+    }
+
+    function projectCounterDecremented(userId, projectId, taskId) {
+      let path = projectPath(userId, projectId);
+      return exists(path)
+        && existsAfter(path)
+        && get(path).data.taskCount == getAfter(path).data.taskCount + 1
+        && getAfter(path).data.lastMutationTaskId == taskId;
+    }
+
+    function validProjectCounterTransition(userId, projectId, data) {
+      let path = taskPath(userId, data.lastMutationTaskId);
+      return data.lastMutationTaskId is string
+        && data.lastMutationTaskId.size() > 0
+        && (
+          (
+            data.taskCount == resource.data.taskCount + 1
+            && !exists(path)
+            && existsAfter(path)
+            && getAfter(path).data.projectId == projectId
+          )
+          || (
+            data.taskCount == resource.data.taskCount + 1
+            && exists(path)
+            && existsAfter(path)
+            && (
+              !('projectId' in get(path).data)
+              || get(path).data.projectId != projectId
+            )
+            && getAfter(path).data.projectId == projectId
+          )
+          || (
+            resource.data.taskCount == data.taskCount + 1
+            && exists(path)
+            && !existsAfter(path)
+            && get(path).data.projectId == projectId
+          )
+          || (
+            resource.data.taskCount == data.taskCount + 1
+            && exists(path)
+            && existsAfter(path)
+            && get(path).data.projectId == projectId
+            && getAfter(path).data.projectId != projectId
+          )
+        );
+    }
+
+    function validTaskProjectChange(userId, taskId, oldProjectId, newProjectId) {
+      return oldProjectId == newProjectId
+        ? existsAfter(projectPath(userId, newProjectId))
+          && getAfter(projectPath(userId, newProjectId)).data.taskCount
+            == get(projectPath(userId, newProjectId)).data.taskCount
+        : projectCounterDecremented(userId, oldProjectId, taskId)
+          && projectCounterIncremented(userId, newProjectId, taskId);
+    }
+
+    match /users/{userId} {
+      allow get: if signedInAs(userId);
+      allow list, delete: if false;
+      allow create, update: if signedInAs(userId) && validProfile(request.resource.data);
+
+      match /projects/{projectId} {
+        allow get, list: if signedInAs(userId);
+        allow create: if signedInAs(userId)
+          && validProject(request.resource.data)
+          && request.resource.data.taskCount == 0
+          && request.resource.data.lastMutationTaskId == null;
+        allow update: if signedInAs(userId)
+          && validProject(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (
+            (
+              request.resource.data.taskCount == resource.data.taskCount
+              && request.resource.data.lastMutationTaskId == resource.data.lastMutationTaskId
+            )
+            || validProjectCounterTransition(userId, projectId, request.resource.data)
+          );
+        allow delete: if signedInAs(userId) && resource.data.taskCount == 0;
+      }
+
+      match /tasks/{taskId} {
+        allow get, list: if signedInAs(userId);
+        allow create: if signedInAs(userId)
+          && validTask(request.resource.data)
+          && projectCounterIncremented(userId, request.resource.data.projectId, taskId)
+          && existsAfter(projectPath(userId, request.resource.data.projectId));
+        allow update: if signedInAs(userId)
+          && validTask(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (
+            (
+              !('projectId' in resource.data)
+              && projectCounterIncremented(userId, request.resource.data.projectId, taskId)
+              && existsAfter(projectPath(userId, request.resource.data.projectId))
+            )
+            || (
+              'projectId' in resource.data
+              && validTaskProjectChange(
+                userId, taskId, resource.data.projectId, request.resource.data.projectId
+              )
+            )
+          );
+        allow delete: if signedInAs(userId)
+          && 'projectId' in resource.data
+          && projectCounterDecremented(userId, resource.data.projectId, taskId);
+      }
+    }
+  }
+}
