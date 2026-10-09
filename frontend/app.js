@@ -30,10 +30,14 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-const DEFAULT_PROJECTS = [
-  "Personal", "Nexoverse", "Student Nexus",
-  "Microsoft Fabric User Group Hyderabad", "GitHub Dev Days",
-  "Content Creation", "Career"
+const LEGACY_DEFAULT_PROJECTS = [
+  { id: "default-1", name: "Personal" },
+  { id: "default-2", name: "Nexoverse" },
+  { id: "default-3", name: "Student Nexus" },
+  { id: "default-4", name: "Microsoft Fabric User Group Hyderabad" },
+  { id: "default-5", name: "GitHub Dev Days" },
+  { id: "default-6", name: "Content Creation" },
+  { id: "default-7", name: "Career" }
 ];
 const state = {
   user: null, projects: [], tasks: [], view: "Today", query: "",
@@ -102,14 +106,10 @@ function setSignedIn(user) {
   $("user-name").textContent = user.displayName || "TaskVerse user";
   $("user-email").textContent = user.email || "";
   $("avatar").textContent = (user.displayName || user.email || "T").slice(0,1).toUpperCase();
-  $("sync-status").textContent = "Syncing…";
-  $("footer-sync").textContent = "Connected to Firebase";
-  document.querySelector(".sync-dot").classList.add("online");
   $("auth-error").hidden = true;
   render();
   bootstrapUser().catch(error => {
     state.loading = false;
-    $("sync-status").textContent = "Sync failed";
     showNotice(error.code === "permission-denied"
       ? "Firestore denied access. Publish the owner-only Firestore rules from the README."
       : error.message || "Could not load your Firebase data.");
@@ -124,21 +124,7 @@ function signedOut() {
   state.view = "Today";
   $("auth-overlay").hidden = false;
   $("user-box").hidden = true;
-  $("sync-status").textContent = "Not signed in";
-  $("footer-sync").textContent = "Your tasks sync to Firebase";
-  document.querySelector(".sync-dot").classList.remove("online");
   render();
-}
-async function ensureDefaultProjects() {
-  const uid = state.user.uid;
-  await Promise.all(DEFAULT_PROJECTS.map((name, index) => {
-    const id = `default-${index + 1}`;
-    const projectRef = doc(db, "users", uid, "projects", id);
-    return runTransaction(db, async transaction => {
-      const snapshot = await transaction.get(projectRef);
-      if (!snapshot.exists()) transaction.set(projectRef, makeProject(name));
-    });
-  }));
 }
 async function ensureLegacyProject(name) {
   const id = legacyProjectId(name);
@@ -148,6 +134,49 @@ async function ensureLegacyProject(name) {
     if (!snapshot.exists()) transaction.set(projectRef, makeProject(name));
   });
   return { id, name };
+}
+async function removeUntouchedEmptyDefaultProjects(tasks) {
+  const removed = [];
+  const preserved = [];
+  const uid = state.user.uid;
+  const projectKeys = [
+    "name", "description", "taskCount", "createdAt",
+    "updatedAt", "lastMutationTaskId"
+  ];
+
+  for (const project of LEGACY_DEFAULT_PROJECTS) {
+    const isReferenced = tasks.some(task =>
+      task.projectId === project.id
+      || (!task.projectId && String(task.project || "Personal") === project.name)
+    );
+    if (isReferenced) {
+      preserved.push(`${project.name} (has tasks)`);
+      continue;
+    }
+
+    const projectRef = doc(db, "users", uid, "projects", project.id);
+    const result = await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(projectRef);
+      if (!snapshot.exists()) return "absent";
+      const data = snapshot.data();
+      const hasOriginalShape = Object.keys(data).length === projectKeys.length
+        && projectKeys.every(key => Object.hasOwn(data, key));
+      const isUntouchedDefault = hasOriginalShape
+        && data.name === project.name
+        && data.description === ""
+        && data.taskCount === 0
+        && data.createdAt === data.updatedAt
+        && data.lastMutationTaskId === null;
+      if (!isUntouchedDefault) return "changed";
+      transaction.delete(projectRef);
+      return "removed";
+    });
+
+    if (result === "removed") removed.push(project.name);
+    if (result === "changed") preserved.push(`${project.name} (has edits)`);
+  }
+
+  return { removed, preserved };
 }
 async function migrateLegacyTask(task) {
   const projectName = String(task.project || "Personal");
@@ -192,34 +221,40 @@ async function bootstrapUser() {
     updatedAt: now
   }, { merge: true });
 
-  await ensureDefaultProjects();
   let projectsSnapshot = await getDocs(projectsCollection());
   state.projects = projectsSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
 
   const legacyTasks = await getDocs(tasksCollection());
-  for (const item of legacyTasks.docs) {
-    const task = { id: item.id, ...item.data() };
+  const userTasks = legacyTasks.docs.map(item => ({ id: item.id, ...item.data() }));
+  for (const task of userTasks) {
     if (!task.projectId || !task.status || typeof task.description !== "string") {
       await migrateLegacyTask(task);
     }
   }
 
+  const cleanupResult = await removeUntouchedEmptyDefaultProjects(userTasks);
   projectsSnapshot = await getDocs(projectsCollection());
   state.projects = projectsSnapshot.docs.map(item => ({ id: item.id, ...item.data() }))
     .sort((a, b) => a.name.localeCompare(b.name));
   await loadTasks();
+  if (cleanupResult.removed.length || cleanupResult.preserved.length) {
+    const removedMessage = cleanupResult.removed.length
+      ? `Removed unused default projects: ${cleanupResult.removed.join(", ")}.`
+      : "";
+    const preservedMessage = cleanupResult.preserved.length
+      ? ` Kept defaults that were edited or have tasks: ${cleanupResult.preserved.join(", ")}.`
+      : "";
+    showNotice(`${removedMessage}${preservedMessage}`, true);
+  }
 }
 async function loadTasks() {
   try {
-    $("sync-status").textContent = "Syncing…";
     const snapshot = await getDocs(tasksCollection());
     state.tasks = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
     state.loading = false;
-    $("sync-status").textContent = "All changes synced";
     render();
   } catch (error) {
     state.loading = false;
-    $("sync-status").textContent = "Sync failed";
     showNotice(error.code === "permission-denied"
       ? "Firestore denied access. Check that your Firestore security rules are published."
       : error.message || "Could not load tasks from Firebase.");
@@ -240,7 +275,8 @@ async function signIn() {
 }
 function openEditor(task = null) {
   if (!state.projects.length) {
-    showNotice("Create or load a project before adding tasks.");
+    showNotice("Create a project first, then add a task.");
+    openProjectEditor();
     return;
   }
   state.editingId = task?.id || null;
@@ -498,7 +534,13 @@ function renderProjects() {
       <button class="nav-item ${state.view === `project:${project.id}` ? "active" : ""}" data-project="${escapeHTML(project.id)}">▦ <span>${escapeHTML(project.name)}</span></button>
       <button class="project-action" data-project-action="edit" data-id="${escapeHTML(project.id)}" aria-label="Edit ${escapeHTML(project.name)}" title="Edit project">✎</button>
       <button class="project-action delete" data-project-action="delete" data-id="${escapeHTML(project.id)}" aria-label="Delete ${escapeHTML(project.name)}" title="Delete project">×</button>
-    </div>`).join("");
+    </div>`).join("") || (state.loading
+      ? `<div class="project-empty"><p>Loading projects…</p></div>`
+      : `
+      <div class="project-empty">
+        <p>No projects yet.</p>
+        <button class="project-empty-create" data-create-project>Create Project</button>
+      </div>`);
 }
 function render() {
   renderProjects();
@@ -527,8 +569,9 @@ function render() {
   if (state.loading && !tasks.length) {
     $("task-list").innerHTML = `<div class="empty"><h3>Loading your workspace…</h3></div>`;
   } else if (!tasks.length) {
-    $("task-list").innerHTML = `<div class="empty"><div class="empty-icon">✓</div><h3>${state.query ? "No matching tasks." : "A little breathing room."}</h3><p>${state.query ? "Try another search or clear the search box." : "Nothing here right now. Add a task when you're ready."}</p><button class="btn primary" id="empty-add">＋ Add a task</button></div>`;
-    $("empty-add").addEventListener("click", () => openEditor());
+    const needsProject = state.projects.length === 0 && !state.query;
+    $("task-list").innerHTML = `<div class="empty"><div class="empty-icon">✓</div><h3>${state.query ? "No matching tasks." : needsProject ? "Start with a project." : "A little breathing room."}</h3><p>${state.query ? "Try another search or clear the search box." : needsProject ? "Create a project to organize your tasks." : "Nothing here right now. Add a task when you're ready."}</p><button class="btn primary" id="empty-add">${needsProject ? "＋ Create Project" : "＋ Add a task"}</button></div>`;
+    $("empty-add").addEventListener("click", () => needsProject ? openProjectEditor() : openEditor());
   } else {
     $("task-list").innerHTML = tasks.map(task => {
       const project = projectName(task.projectId, task.project || "Unassigned");
@@ -553,6 +596,10 @@ function init() {
     render();
   });
   $("project-nav").addEventListener("click", event => {
+    if (event.target.closest("[data-create-project]")) {
+      openProjectEditor();
+      return;
+    }
     const actionButton = event.target.closest("[data-project-action]");
     if (actionButton) {
       const project = state.projects.find(item => item.id === actionButton.dataset.id);

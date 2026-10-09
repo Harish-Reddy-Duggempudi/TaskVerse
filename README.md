@@ -12,7 +12,7 @@ Every Firestore path is constructed from the authenticated Firebase user's UID. 
 
 After sign-in, the workspace greets the user using the first name from Firebase Authentication. The interface uses initials and text/icons rather than profile photos or decorative image assets. Its responsive footer includes creator attribution, LinkedIn links, and the official Nexoverse website.
 
-On first sign-in after this schema update, the app creates the existing built-in projects for that user and transactionally adds `projectId`, `description`, and `status` fields to their existing task documents. Existing task IDs, titles, notes, dates, and completion state are retained; tasks are not deleted or moved to another collection. Publish the updated rules below before using this migration. No bulk or destructive migration is required.
+New accounts start without projects; create one from the sidebar or the empty-state button. On sign-in, the app migrates existing legacy tasks in place by adding `projectId`, `description`, and `status`; task IDs, titles, notes, dates, and completion state are retained. It does not create a predefined project list. For each signed-in user's own data, it removes only old built-in projects with their original IDs and names, an empty description, zero task count, an untouched timestamp pair, no extra fields, and no task references. Defaults with tasks, edits, or uncertain metadata are preserved and reported. User-created projects are not removed. Publish the updated rules below before using this migration; no task is deleted or moved to another collection.
 
 Project deletion is refused when tasks remain assigned. Task create, delete, reassignment, and project deletion coordinate through Firestore transactions and a per-project task counter. Security Rules require task writes that change a counter to include the corresponding task mutation in the same atomic operation. This makes concurrent project deletion and task creation conflict safely. Firestore client transactions can read documents, not run a query and use its results atomically; deletion therefore relies on the transactionally maintained counter rather than a query as its safety guarantee.
 
@@ -26,16 +26,20 @@ The web app Firebase configuration is in `frontend/app.js`. Firebase web API key
 4. In **Firestore Database**, create a database. Choose the location nearest to the people using the app; a database's location cannot be changed after creation. For users mainly in India, consider `asia-south1` (Mumbai) if it is available.
 5. Open **Firestore Database → Rules**, replace the current rules with the complete contents of [`firestore.rules`](./firestore.rules), and click **Publish**. These owner-only rules cover the user profile, projects, and tasks, validate task/project fields, and enforce the transaction-based task counter. Do not enable public read or write access.
 
+## Search engine and social metadata
+
+The app is a sign-in-gated personal workspace, not a public landing page. Its page metadata, `frontend/robots.txt`, and Vercel `X-Robots-Tag` response header tell compliant crawlers not to index the app. The canonical URL and social preview metadata use `https://taskverse.nexoverse.in/`; no sitemap or preview image is published because there is no public/indexable landing page or dedicated social image. These crawler directives are not an access-control mechanism: Firebase Authentication and the owner-only Firestore Rules protect private user data.
+
 ## Run and deploy
 
 ### Deploy to Vercel
 
-The intended production site is [https://taskverse-seven.vercel.app/](https://taskverse-seven.vercel.app/). The repository root does not contain the HTML entry point; the static app is in `frontend/`. The root [`vercel.json`](./vercel.json) selects Vercel's static/Other framework mode and publishes only `frontend/`, so `frontend/index.html` is the deployed root document and backend-only source is excluded.
+The intended production site is [https://taskverse.nexoverse.in/](https://taskverse.nexoverse.in/). The repository root does not contain the HTML entry point; the static app is in `frontend/`. The root [`vercel.json`](./vercel.json) selects Vercel's static/Other framework mode and publishes only `frontend/`, so `frontend/index.html` is the deployed root document and backend-only source is excluded.
 
 1. Import this GitHub repository into Vercel or open its existing Vercel project.
 2. Use the repository root (`.`) as the project root so Vercel can read `vercel.json`. Leave the Framework Preset as **Other** and do not set a build command. The config sets `frontend` as the output directory.
-3. In **Settings → Domains**, confirm `taskverse-seven.vercel.app` is assigned to this project. A source change does not reassign a domain that belongs to a different Vercel project.
-4. Confirm Firebase Authentication has `taskverse-seven.vercel.app` under **Authorized domains**, Google sign-in is enabled, and the owner-only Firestore rules above are published.
+3. In **Settings → Domains**, assign `taskverse.nexoverse.in` to this project and complete Vercel's DNS verification steps. Keep the Vercel-provided domain only if you still intend to serve the app there.
+4. Confirm Firebase Authentication has `taskverse.nexoverse.in` under **Authorized domains**, Google sign-in is enabled, and the owner-only Firestore rules above are published.
 5. Commit and push the changes to the connected Git branch, then verify the Vercel deployment is ready and open the production URL. Do not treat a local validation as proof of deployment.
 
 All frontend asset, manifest, and service-worker URLs are relative to the app root. The service worker is deployed at `/sw.js` and controls only the site origin. The Vercel output directory contains only frontend files; `apps-script/`, `cloudflare-worker/`, Firestore rules, and documentation are not published as site assets.
