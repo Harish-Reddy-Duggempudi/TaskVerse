@@ -1,0 +1,14 @@
+{
+  "id": "./",
+  "name": "TaskVerse — Personal Workspace",
+  "short_name": "TaskVerse",
+  "description": "Your personal tasks, projects and deadlines in one place.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f7fc",
+  "theme_color": "#17172b",
+  "icons": [
+    {"src":"./icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}
+  ]
+}

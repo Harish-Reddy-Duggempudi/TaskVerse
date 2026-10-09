@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#17172b">
+  <meta name="description" content="TaskVerse personal task and project manager">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>TaskVerse — Your personal workspace</title>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="./"><span class="brand-icon">✓</span><span>TaskVerse<small>PERSONAL WORKSPACE</small></span></a>
+      <p class="nav-label">WORKSPACE</p>
+      <nav id="main-nav">
+        <button class="nav-item active" data-view="Today">◷ <span>My Day</span></button>
+        <button class="nav-item" data-view="All Tasks">☷ <span>All Tasks</span></button>
+        <button class="nav-item" data-view="Upcoming">▦ <span>Upcoming</span></button>
+        <button class="nav-item" data-view="Completed">✓ <span>Completed</span></button>
+      </nav>
+      <p class="nav-label projects-label">PROJECTS</p>
+      <nav id="project-nav"></nav>
+      <div class="sidebar-bottom">
+        <div class="sync-label"><span class="sync-dot"></span><span id="sync-status">Not signed in</span></div>
+        <div class="user-box" id="user-box" hidden>
+          <div class="avatar" id="avatar">T</div><div class="user-details"><strong id="user-name">User</strong><small id="user-email"></small></div>
+          <button id="sign-out" class="icon-btn" title="Sign out" aria-label="Sign out">↪</button>
+        </div>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="crumb">Workspace <span>/</span> <strong id="current-view">My Day</strong></div>
+        <div class="top-actions">
+          <label class="search"><span>⌕</span><input id="search" placeholder="Search tasks or projects…" autocomplete="off"></label>
+          <button class="btn primary" id="new-task-top">＋ New task</button>
+        </div>
+      </header>
+      <section class="content">
+        <div class="hero">
+          <div><p class="eyebrow">✦ A FRESH START</p><h1 id="heading">Your day, your pace.</h1><p class="subheading" id="subheading">Small steps today. Big things over time.</p></div>
+          <div class="date-pill" id="today-date"></div>
+        </div>
+        <section class="stats">
+          <article class="stat-card"><span class="stat-symbol lavender">☷</span><p>Total tasks</p><strong id="stat-total">0</strong><small>Across your workspace</small></article>
+          <article class="stat-card"><span class="stat-symbol amber">◷</span><p>Still to do</p><strong id="stat-open">0</strong><small>One step at a time</small></article>
+          <article class="stat-card"><span class="stat-symbol mint">✓</span><p>Completed</p><strong id="stat-done">0</strong><small>Every win counts</small></article>
+          <article class="stat-card"><span class="stat-symbol blue">✦</span><p>Progress</p><strong id="stat-progress">0%</strong><div class="progress"><span id="progress-bar"></span></div></article>
+        </section>
+        <section class="task-editor panel" id="task-editor" hidden>
+          <div class="editor-head"><div><h2 id="editor-title">Create a task</h2><p>Capture it now, tackle it when ready.</p></div><button class="icon-btn" id="close-editor" aria-label="Close">×</button></div>
+          <form id="task-form">
+            <input id="task-title" maxlength="180" placeholder="What do you need to get done?" required>
+            <div class="form-grid">
+              <label>Project<select id="task-project"></select></label>
+              <label>Priority<select id="task-priority"><option>High</option><option selected>Medium</option><option>Low</option></select></label>
+              <label>Due date<input id="task-due" type="date"></label>
+            </div>
+            <label class="description-label">Notes (optional)<textarea id="task-notes" maxlength="1000" rows="2" placeholder="Add a little context…"></textarea></label>
+            <div class="editor-footer"><button type="button" class="btn secondary" id="cancel-editor">Cancel</button><button class="btn primary" id="save-task">Save task</button></div>
+          </form>
+        </section>
+        <div class="notice" id="notice" role="status" hidden></div>
+        <section class="task-section">
+          <div class="section-head"><div><h2 id="list-title">My Day</h2><p id="task-count">0 tasks</p></div><button class="text-btn" id="view-all">View all tasks →</button></div>
+          <div class="task-list panel" id="task-list">
+            <div class="empty"><div class="empty-icon">✓</div><h3>Ready when you are.</h3><p>Sign in to load your tasks or create your first task.</p></div>
+          </div>
+        </section>
+        <footer><span>☁ <span id="footer-sync">Your tasks sync to Firebase</span></span><span>Made for a more focused you ✦</span></footer>
+      </section>
+    </main>
+  </div>
+
+  <div class="auth-overlay" id="auth-overlay">
+    <section class="auth-card">
+      <div class="brand-icon auth-logo">✓</div>
+      <p class="eyebrow">YOUR PERSONAL WORKSPACE</p>
+      <h1>Make room for<br><span>what matters.</span></h1>
+      <p class="auth-copy">Manage your tasks, projects and goals in one calm space. Sign in with Google to get started.</p>
+      <button id="google-sign-in" class="btn primary google-signin">Continue with Google</button>
+      <p class="auth-help">Your Google account is used for sign-in only. TaskVerse never asks for or stores your Google password.</p>
+      <p class="auth-error" id="auth-error" hidden></p>
+    </section>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
