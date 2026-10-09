@@ -61,9 +61,22 @@ These rules allow users to access only `users/{their Firebase UID}/tasks/*`; do 
 
 ## Run and deploy
 
-Serve the contents of `frontend/` from a local development server or an HTTPS static host. Opening `index.html` directly with a `file://` URL will not work because browser module imports and Firebase Authentication require a web origin. For GitHub Pages, publish the contents of `frontend/` so `index.html` is at the hosting root. Add the resulting hostname under Firebase Authentication's authorized domains.
+### Deploy to GitHub Pages
 
-After the Firebase setup, sign in with Google and test creating, editing, completing, deleting, and refreshing tasks. To verify data isolation, sign in with a second Google account and confirm it cannot see the first account's tasks.
+The complete source stays in this repository, while GitHub Pages publishes only `frontend/`. The GitHub Actions workflow uploads that directory as the Pages artifact, placing its `index.html` at the site root. This avoids exposing backend source as website assets and avoids serving this README instead of the app.
+
+1. In the GitHub repository, open **Settings → Pages**.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**. Do not select **Deploy from a branch** or publish the repository root.
+3. Commit and push the workflow and project changes to the `main` branch. The workflow is `.github/workflows/deploy-pages.yml`; it deploys when frontend files change and can also be started from **Actions → Deploy TaskVerse to GitHub Pages → Run workflow**.
+4. In **Firebase Console → Authentication → Settings → Authorized domains**, add `harish-reddy-duggempudi.github.io`. Enter only the hostname—no scheme, repository path, or trailing slash.
+5. In **Firebase Console → Authentication → Sign-in method**, ensure Google sign-in is enabled. Confirm Firestore exists and its owner-only rules above are published.
+6. Wait for **Actions → Deploy TaskVerse to GitHub Pages** to complete successfully. Open [https://harish-reddy-duggempudi.github.io/TaskVerse/](https://harish-reddy-duggempudi.github.io/TaskVerse/).
+
+The site is hosted under the `/TaskVerse/` project path. Frontend asset, manifest, and service-worker URLs are relative to that path, and the service worker scope is limited to the app. The workflow publishes only `frontend/`; `apps-script/`, `cloudflare-worker/`, `.gitignore`, and documentation remain in the source repository and are not uploaded as website files.
+
+Opening `frontend/index.html` directly with a `file://` URL will not work because Firebase browser modules and Google sign-in require a web origin. For local testing, serve the contents of `frontend/` from `localhost`.
+
+After the Firebase setup and deployment, sign in with Google and test creating, editing, completing, deleting, and refreshing tasks. To verify data isolation, sign in with a second Google account and confirm it cannot see the first account's tasks.
 
 ## PWA and offline behavior
 
